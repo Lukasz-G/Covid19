@@ -3,13 +3,16 @@ def pipeline(paths_to_files, process_nb):
     
     #this function is supposed to run within multiprocessing
     #so the imports go this way...
-    import os, json
+    import os, json, uuid, re
     from tqdm import tqdm
+    import numpy as np
     from langdetect import detect
-    from PreProcessUtils import init_nlp, init_ner, translate
+    from PreProcessUtils import init_nlp, init_ner, translate, extract_tables_from_json, further_clean_section
+    from collections import defaultdict
     
-    if not os.path.exists("preprocessed"):
-        os.mkdir("preprocessed")
+    folder_name = "preprocessed"#.format(process_nb)
+    if not os.path.exists(folder_name):
+        os.mkdir(folder_name)
     
     
     nlp, linker = init_nlp()
@@ -61,33 +64,72 @@ def pipeline(paths_to_files, process_nb):
         
         #try to get abstract if extisting
         try:
-            paper_abstract = json_file["abstract"][0]['text']
+            paper_abstract = json_file["abstract"]#[abstract_paragraph for abstract_paragraph in json_file["abstract"]]
         except:
             paper_abstract = False
+        preprocessed_file["abstract"] = []
+        
         #get the body text being a list of sections
         body_text = json_file["body_text"]
+        #we will gather section names and ids in a list
+        preprocessed_file["text_body"] = []
+        #add abstract paragraphs to text body and keep the track of them
+        abstract_sections_nb = 0
+        if paper_abstract:
+            body_text = paper_abstract + body_text
+            abstract_sections_nb = len(paper_abstract)
         
         #quick check if body text has at all some text
         all_text = ' '.join([x['text'] for x in body_text])
         if len(all_text) > 5:
             pass
         else:
+            continue
             pass#add some actions if the file doesn't have any text
+        
+        
+        
         
         #find out the language of the paper
         #what to do if language other than EN? Translate or omit...?
-        found_lang = detect(all_text[:100])
-        preprocessed_file['language'] = found_lang
+        try:
+            found_lang = detect(all_text[:1000])
+            preprocessed_file['language'] = found_lang
+        except:
+            print(all_text[:1000], 'some lang detect error')
+            continue
         if found_lang != 'en':
             #if language other than EN then use Google translator to translate section by section
+            original_text = '\n'.join(['\n'.join([section_body['section'], section_body['text']]) for section_body in body_text])
+            preprocessed_file["original_text"] = original_text
             body_text = [{'text':translate(section_body['text']),'section':translate(section_body['section'])} for section_body in body_text]
+        else:
+            preprocessed_file["original_text"] = []
         
         
+        #extract tables if applicable
+        tables = extract_tables_from_json(json_file)
+        preprocessed_file["tables"] = tables
+        
+        
+        section_ids_list = []
         #iterate over a list of sections
-        for section_body in body_text:
+        for section_nb, section_body in enumerate(body_text):
             #extract the text and the name of a section
             section_text = section_body['text']
             section_name = section_body['section']
+            section_name = further_clean_section(section_name)
+            section_id = str(uuid.uuid1())
+            #section_dict["section_id"] = section_id
+            
+            section_ids_list.append(section_id)
+            
+            
+            if section_nb < abstract_sections_nb:
+                preprocessed_file["abstract"].append(section_id)
+            else:
+                preprocessed_file["text_body"].append({"section_id":section_id,"section_name":section_name})
+                
             
             #let spacy digest the text content
             doc = nlp(section_text)
@@ -105,112 +147,75 @@ def pipeline(paths_to_files, process_nb):
                         join_list.append(str(doc.text[abbrev.start_char:abbrev.end_char]))
                     start = abbrev.end_char
                 # Reassign fixed body text to article in df.
-                new_text = "".join(join_list)
+                section_text = "".join(join_list)
                 # We have new text. Re-nlp the doc for futher processing!
-                doc = nlp(new_text)
-    
+                doc = nlp(section_text)
             
+            #uuid.uuid1
+            #print(list(doc.sents))
+            #print(len(doc.sents))
             
-            ######here I have stopped to adapt the code... last check point
-
-            lemmas.append([token.lemma_.lower() for token in doc if not token.is_stop and re.search('[a-zA-Z]', str(token))])
-                doc_ents = []
-                for ent in doc.ents: 
+            section_sent_ids_list = []
+            for single_sentence in doc.sents:
+                sentence_dict = {}
+                sentence_id = str(uuid.uuid1())
+                section_sent_ids_list.append(sentence_id)
+                sentence_dict["sentence_id"] = sentence_id
+                tokens = single_sentence.text
+                sentence_dict["tokens"] = tokens
+                #print(tokens)
+                #quit()
+                lemmas = [token.lemma_.lower() for token in single_sentence if not token.is_stop and re.search('[a-zA-Z]', str(token))]
+                sentence_dict["lemmas"] = lemmas
+                #print(tokens, lemmas)
+                #quit()
+                sent_ents = []
+                for ent in single_sentence.ents: 
                     if len(ent._.umls_ents) > 0:
+                        #print(len(ent._.umls_ents))
                         poss = linker.umls.cui_to_entity[ent._.umls_ents[0][0]].canonical_name
-                        doc_ents.append(poss)
-                entities.append(doc_ents)
-                umls_ids.append([entity._.umls_ents[0][0] for entity in doc.ents if len(entity._.umls_ents) > 0])
-                _ids.append(df.iloc[i]["cord_uid"])
-                sections.append(df.iloc[i]["section"])
-                section_ids.append(df.iloc[i]["section_uid"])
-    
-            else:   
-                try: 
-                    text = translate(df.iloc[i]["text"])
-                    doc = nlp(str(df.iloc[i]["text"]))
-    
-                    if len(doc._.abbreviations) > 0:
-                        doc._.abbreviations.sort()
-                        join_list = []
-                        start = 0
-                        for abbrev in doc._.abbreviations:
-                            join_list.append(str(doc.text[start:abbrev.start_char]))
-                            if len(abbrev._.long_form) > 5: #Increase length so "a" and "an" don't get un-abbreviated
-                                join_list.append(str(abbrev._.long_form))
-                            else:
-                                join_list.append(str(doc.text[abbrev.start_char:abbrev.end_char]))
-                            start = abbrev.end_char
-                        # Reassign fixed body text to article in df.
-                        new_text = "".join(join_list)
-                        # We have new text. Re-nlp the doc for futher processing!
-                        doc = nlp(new_text)
-    
-                    if len(doc.text) > 5:
-                        languages.append(doc._.language["language"])
-                        vectors.append(doc.vector)
-                        translated.append(True)
-                        sections.append(df.iloc[i]["section"])
-                        section_ids.append(df.iloc[i]["section_uid"])
-    
-                        lemmas.append([token.lemma_ for token in doc if not token.is_stop and re.search('[a-zA-Z]', str(token))])
-                        for ent in doc.ents: 
-                            if len(ent._.umls_ents) > 0:
-                                poss = linker.umls.cui_to_entity[ent._.umls_ents[0][0]].canonical_name
-                                entities.append(poss)
-                        umls_ids.append([entity._.umls_ents[0][0] for entity in doc.ents if len(entity._.umls_ents) > 0])
-                        entities.append(doc_ents)
-                        _ids.append(df.iloc[i]["cord_uid"])
-                        sections.append(df.iloc[i]["section"]) ######
-                        section_ids.append(df.iloc[i]["section_uid"])
-    
-                except:
-                    entities.append("[]")
-                    translated.append(False)
-                    vectors.append(np.zeros(200))
-                    lemmas.append("[]")
-                    _ids.append(df.iloc[i,0])
-                    umls_ids.append("[]")
-                    languages.append(doc._.language["language"])
-                    section_ids.append(df.iloc[i]["section_uid"])
-                    sections.append(df.iloc[i]["section"])
+                        #print(poss, '-----------------------', poss.canonical_name)
+                        #quit()
+                        sent_ents.append(poss)
+                    #sent_ents.append(ent.text)
+                #quit()
+                sentence_dict["umls"] = sent_ents
+                
+            
+                umls_ids = [entity._.umls_ents[0][0] for entity in single_sentence.ents if len(entity._.umls_ents) > 0]
+                sentence_dict["umls_ids"] = umls_ids
+                
+                sentence_vectors = [token.vector for token in single_sentence if not token.is_stop]
+                if len(sentence_vectors)>0:
+                    sentence_vector = np.stack(sentence_vectors, axis=0).sum(0).tolist()
+                else:
+                    sentence_vector = []
+                sentence_dict["sent2vec"] = sentence_vector
+                
+                for nlp in nlps:
+                    doc = nlp(section_text)
+                    for single_sentence in doc.sents:
+                        keys = list(set([ent.label_ for ent in single_sentence.ents]))
+                        for key in keys:
+                            if key not in scispacy_ent_types:
+                                sentence_dict[key] = []
+                            values = [ent.text for ent in single_sentence.ents if ent.label_ == key]
+                            sentence_dict[key] = values
+                            
+                #list_of_sent_dics.append(sentence_dict)
+                
+                preprocessed_file[sentence_id] = sentence_dict
+            preprocessed_file[section_id] = section_sent_ids_list    
+        
+                                
+            ######here I have stopped to adapt the code... last check point
+            
 
+        #pbar.update()
+        with open(os.path.join(folder_name,paper_id+".json"), "w", encoding="utf-8") as f:
+            json.dump(preprocessed_file, f, ensure_ascii=False)
+            f.close()
         pbar.update()
-    
-    li1 = _ids
-    li2 = sections
-    li3 = [i for i in range(len(entities))]
-
-    #     sentence_id = [str(x) + str(y) + str(z)  for x,y,z in zip(li1,li2,li3)]
-
-    new_df = pd.DataFrame(data={"cord_uid": _ids,   
-                                "section_uid": section_ids, 
-                                "section": sections, 
-                                "lemma": lemmas, 
-                                "UMLS": entities, 
-                                "UMLS_IDS": umls_ids, 
-                                "w2vVector": vectors, 
-                                "translated":translated})
-
-    for col in scispacy_ent_types:
-        new_df[col] = "[]"
-    for j in tqdm(new_df.index):
-        for nlp in nlps:
-            doc = nlp(str(new_df.iloc[j]["section"]))
-            keys = list(set([ent.label_ for ent in doc.ents]))
-            for key in keys:
-
-                # Some entity types are present in the model, but not in the documentation! 
-                # In that case, we'll just automatically add it to the df. 
-                if key not in scispacy_ent_types:
-                    new_df = pd.concat([new_df,pd.DataFrame(columns=[key])])
-                    new_df[key] = "[]"
-
-                values = [ent.text for ent in doc.ents if ent.label_ == key]
-                new_df.at[j,key] = values
-
-
-    new_df["w2vVector"] = [np.asarray(a=i, dtype="float64") for i in new_df["w2vVector"].to_list()]
-
-
-    new_df.to_pickle("df_parts/" + new_df.iloc[0]["section_uid"] + ".pickle", compression="gzip")            
+        
+    return
+               

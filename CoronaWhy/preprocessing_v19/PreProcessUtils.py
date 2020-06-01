@@ -28,6 +28,17 @@ from pandas.io.json import json_normalize
 import uuid
 
 
+def chunking(seq, num):
+    avg = len(seq) / float(num)
+    out = []
+    last = 0.0
+
+    while last < len(seq):
+        out.append(seq[int(last):int(last + avg)])
+        last += avg
+
+    return out
+
 def translate(text):
     translator=Translator()
     translation=translator.translate(str(text), dest='en').text
