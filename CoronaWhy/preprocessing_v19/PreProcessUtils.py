@@ -9,7 +9,6 @@ import json
 import spacy
 from tqdm import tqdm
 from scipy.spatial import distance
-import ipywidgets as widgets
 from scispacy.abbreviation import AbbreviationDetector
 from spacy_langdetect import LanguageDetector
 # UMLS linking will find concepts in the text, and link them to UMLS. 

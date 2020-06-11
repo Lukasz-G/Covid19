@@ -115,6 +115,7 @@ def pipeline(paths_to_files, process_nb):
         section_ids_list = []
         #iterate over a list of sections
         for section_nb, section_body in enumerate(body_text):
+            #print("---new section---")
             #extract the text and the name of a section
             section_text = section_body['text']
             section_name = section_body['section']
@@ -134,6 +135,11 @@ def pipeline(paths_to_files, process_nb):
             #let spacy digest the text content
             doc = nlp(section_text)
             
+            #for sent in doc.sents:
+            #    for ent in sent.ents:
+            #        print(ent._.umls_ents)
+            #continue
+            
             #let unabbreviate the abbreviation
             if len(doc._.abbreviations) > 0:
                 doc._.abbreviations.sort()
@@ -152,11 +158,22 @@ def pipeline(paths_to_files, process_nb):
                 doc = nlp(section_text)
             
             #uuid.uuid1
-            #print(list(doc.sents))
+            #print(list(doc.ents))
+            #
+            #for ent in doc.ents:
+            #    print(ent._.umls_ents)
+                
+            #for sent in doc.sents:
+            #    for ent in sent.ents:
+            #        print(ent._.umls_ents)
+                #print(linker.umls.cui_to_entity[ent._.umls_ents[0][0]].canonical_name)
+            #print(nlp.pipeline)
+            #quit()
             #print(len(doc.sents))
             
             section_sent_ids_list = []
             for single_sentence in doc.sents:
+                #print("---new sentence---")
                 sentence_dict = {}
                 sentence_id = str(uuid.uuid1())
                 section_sent_ids_list.append(sentence_id)
@@ -171,10 +188,11 @@ def pipeline(paths_to_files, process_nb):
                 #quit()
                 sent_ents = []
                 for ent in single_sentence.ents: 
+                    #print("normal ent: {}, umls: {}".format(ent,ent._.umls_ents))
                     if len(ent._.umls_ents) > 0:
                         #print(len(ent._.umls_ents))
                         poss = linker.umls.cui_to_entity[ent._.umls_ents[0][0]].canonical_name
-                        #print(poss, '-----------------------', poss.canonical_name)
+                        #print(poss, '-----------------------')
                         #quit()
                         sent_ents.append(poss)
                     #sent_ents.append(ent.text)
@@ -192,8 +210,8 @@ def pipeline(paths_to_files, process_nb):
                     sentence_vector = []
                 sentence_dict["sent2vec"] = sentence_vector
                 
-                for nlp in nlps:
-                    doc = nlp(section_text)
+                for special_nlp in nlps:
+                    doc = special_nlp(section_text)
                     for single_sentence in doc.sents:
                         keys = list(set([ent.label_ for ent in single_sentence.ents]))
                         for key in keys:
@@ -201,6 +219,7 @@ def pipeline(paths_to_files, process_nb):
                                 sentence_dict[key] = []
                             values = [ent.text for ent in single_sentence.ents if ent.label_ == key]
                             sentence_dict[key] = values
+                            
                             
                 #list_of_sent_dics.append(sentence_dict)
                 
@@ -217,5 +236,5 @@ def pipeline(paths_to_files, process_nb):
             f.close()
         pbar.update()
         
-    return
+    return True
                
