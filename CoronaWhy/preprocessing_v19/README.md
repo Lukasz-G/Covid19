@@ -15,6 +15,7 @@ CORD19 collection of scientific papers we are building a pipeline consisting of:
 * [Googletrans](https://github.com/ssut/py-googletrans) for translation of non-English publications
 * [tqdm](https://github.com/tqdm/tqdm) library for progress bars
 * [Memory Profiler](https://github.com/pythonprofilers/memory_profiler) for development purposes
+* [Pandas](https://pandas.pydata.org/) for Cord19 metadata file processing
 * cuasal Python3.7 built-in libraries (random, os, utils etc...)
 
 SciSpacy may malfunction in one way or another because of dependency differences. 
@@ -32,5 +33,7 @@ If you want to monitor RAM usage with Memory Profiler:
 
 After the execution you can plot data from Memory Profiler by:
 `mprof plot`
+
+![mprofplotexecution](Pipeline_RAM_singleprocess2.png "Memory Profiler pop-up")
 
 If you execute the CORD19 pipeline on a server, you can just download the log file of Memory Profiler and run it locally. More [here](https://pypi.org/project/memory-profiler/). 
