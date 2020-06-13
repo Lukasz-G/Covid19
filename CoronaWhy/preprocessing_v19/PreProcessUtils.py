@@ -10,7 +10,6 @@ import spacy
 from tqdm import tqdm
 from scipy.spatial import distance
 from scispacy.abbreviation import AbbreviationDetector
-from spacy_langdetect import LanguageDetector
 # UMLS linking will find concepts in the text, and link them to UMLS. 
 from scispacy.umls_linking import UmlsEntityLinker
 import time
@@ -171,7 +170,7 @@ def init_nlp():
 
     # We also need to detect language, or else we'll be parsing non-english text 
     # as if it were English. 
-    spacy_nlp.add_pipe(LanguageDetector(), name='language_detector', last=True)
+    #spacy_nlp.add_pipe(LanguageDetector(), name='language_detector', last=True)
 
     # Add the abbreviation pipe to the spacy pipeline. Only need to run this once.
     abbreviation_pipe = AbbreviationDetector(spacy_nlp)
