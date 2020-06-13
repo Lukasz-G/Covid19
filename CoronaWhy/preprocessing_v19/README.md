@@ -1,4 +1,4 @@
-#Preprocessing CORD19 v19
+# Preprocessing CORD19 v19
 
 To facilitate the annotation process for the 
 CORD19 collection of scientific papers we are building a pipeline consisting of:
