@@ -85,7 +85,8 @@ def main():
     model_dict["en_ner_bc5cdr_md"] = args.en_ner_bc5cdr_md
     model_dict["en_ner_bionlp13cg_md"] = args.en_ner_bionlp13cg_md
     
-    models_selected = ["--"+k  if type(v) == bool and v == True else '' for k,v in model_dict.items()]
+    models_selected = ["--"+k for k,v in model_dict.items() if type(v) == bool and v == True]
+    
     print("""
        We have {} workers with at least {} GiB RAM free per worker.
        User-specified models for annotation:
@@ -94,6 +95,7 @@ def main():
        {}
        {}
        {}
+    
     """.format(cpu_number, args.RAM_per_worker, *models_selected))
     
     #each process is supposed to receive one copy of the model_dict.
