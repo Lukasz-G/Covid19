@@ -1,30 +1,23 @@
 # -*- coding: utf-8 -*-
 from googletrans import Translator
-import pandas as pd 
-import os
-import os.path
-import numpy as np
-import scispacy
-import json
-import spacy
+import os, scispacy, json, spacy, argparse
 from tqdm import tqdm
-from scipy.spatial import distance
+import pandas as pd
 from scispacy.abbreviation import AbbreviationDetector
 # UMLS linking will find concepts in the text, and link them to UMLS. 
 from scispacy.umls_linking import UmlsEntityLinker
-import time
-from multiprocessing import Process, Queue, Manager
-from multiprocessing.pool import Pool
-from functools import partial
-import re
-import ast
-import random
-from langdetect import detect
 
-from pandas.io.json import json_normalize
 
-import uuid
-
+def str2bool(v):
+    #https://stackoverflow.com/questions/15008758/parsing-boolean-values-with-argparse
+    if isinstance(v, bool):
+       return v
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
 
 def chunking(seq, num):
     avg = len(seq) / float(num)
@@ -184,10 +177,10 @@ def init_nlp():
     
     return(spacy_nlp, linker)
 
-def init_ner():
+def init_ner(model_prefs_dict):
     models = ["en_ner_craft_md", "en_ner_jnlpba_md","en_ner_bc5cdr_md","en_ner_bionlp13cg_md"]
-    nlps = [spacy.load(model) for model in models]
-    return(nlps)
+    nlps = [spacy.load(model) for model in models if model_prefs_dict[model]]
+    return nlps
 
 # Parse and process the metadata
 def preprocess_metadata(directory):
@@ -244,12 +237,6 @@ def preprocess_metadata(directory):
     
     return sha_from_folders, paths_list
 
-def parallelize_dataframe(df, func, n_cores=6, n_parts=400):
-    df_split = np.array_split(df, n_parts)
-    pool = Pool(n_cores)
-    list(tqdm(pool.imap_unordered(func, df_split), total=len(df_split)))
-    pool.close()
-    pool.join()
                     
 def init_list_cols():
     return ['GGP', 'SO', 'TAXON', 'CHEBI', 'GO', 'CL', 'DNA', 'CELL_TYPE', 'CELL_LINE', 'RNA', 'PROTEIN', 
