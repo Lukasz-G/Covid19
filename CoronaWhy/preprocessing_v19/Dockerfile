@@ -2,6 +2,7 @@ FROM python:3.7
 
 # do all in one step
 RUN \
+apt-get update && \
 apt-get install -y software-properties-common && \
 apt-get clean && \
 apt-get update
