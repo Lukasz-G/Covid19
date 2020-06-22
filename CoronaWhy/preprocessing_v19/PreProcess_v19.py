@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import random, argparse, os
+import random, argparse, os, json
 from PreProcessUtils import preprocess_metadata, chunking, str2bool
 from Pipeline_v19 import pipeline
 from pathos.pools import ProcessPool
@@ -46,10 +46,30 @@ def main():
     
     if args.delta == None:
         print("No delta file specified. The pipeline will process the whole collection.")
+        delta_sha_list = False
+    else:
+        with open(args.delta) as f:
+            delta_file = json.load(f)
+            delta_sha_list = delta_file["delta list"]
+            delta_sha_list = ''.join(delta_sha_list)
     
     # Preprocess the metadata to get folder and subfolder structre and the names of files
     files, paths_to_files = preprocess_metadata(args.CORD19_path)
+    #files, paths_to_files = files[:100], paths_to_files[:100]
+    if delta_sha_list:
+        old_doc_nubmer = len(files)
+        files_and_paths = [(file, file_path) for (file, file_path) in zip(files, paths_to_files) if file not in delta_sha_list]
+        print(len(files_and_paths))
+        files, paths_to_files = zip(*files_and_paths)
+        new_doc_number = len(files)
+        print("""
+           A Delta file for CORD19 database has been applied. 
+           Instead of {} files, only {} of them will be annotated. 
+        """.format(old_doc_nubmer, new_doc_number))
+        
     
+    
+    #quit()
     #paths_to_files = paths_to_files[:100]
     #print(paths_to_files)
     file_size_list = [os.path.getsize(x) for x in paths_to_files]

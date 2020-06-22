@@ -221,7 +221,7 @@ def preprocess_metadata(directory):
     
     #sha_list, sha_from_folders = set(sha_list), set(sha_from_folders)
     #print(list(sha_list)[:10], list(sha_from_folders)[0])
-    #print(sha_from_folders.difference(sha_list))
+    #print(len(sha_from_folders.difference(sha_list)))
     #quit()        
         #print(f)
     #onlyfiles = [f for f in os.listdir(local_folder) if os.path.isfile(os.path.join(local_folder,f))]
